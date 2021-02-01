@@ -1,4 +1,5 @@
-# Copyright 2019 The Kubernetes Authors.
+#!/usr/bin/env bash
+# Copyright 2021 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,18 +13,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# first stage build kindnetd binary
-# NOTE: tentatively follow upstream kubernetes go version based on k8s in go.mod
-FROM golang:1.13
-WORKDIR /go/src
-# make deps fetching cacheable
-COPY go.mod go.sum .
-RUN go mod download
-# build
-COPY . .
-RUN CGO_ENABLED=0 go build -o ./kindnetd ./cmd/kindnetd
+set -o errexit -o nounset -o pipefail
 
-# build real kindnetd image
-FROM k8s.gcr.io/build-image/debian-iptables:buster-v1.3.0
-COPY --from=0 --chown=root:root ./go/src/kindnetd /bin/kindnetd
-CMD ["/bin/kindnetd"]
+
+: "${KIND_EXPERIMENTAL_PROVIDER:=docker}"
+SSH_CONFIG=".vagrant/ssh-config"
+if [ ! -f "$SSH_CONFIG" ]; then
+  vagrant ssh-config > "$SSH_CONFIG"
+fi
+
+exec ssh -F "$SSH_CONFIG" default sudo KIND_EXPERIMENTAL_PROVIDER="$KIND_EXPERIMENTAL_PROVIDER" "$@"

@@ -25,7 +25,7 @@ FROM ubuntu:20.10
 # The repository contains latest stable releases and nightlies built for multiple architectures
 ARG CONTAINERD_VERSION="v1.4.0-106-gce4439a8"
 # Configure CNI binaries
-ARG CNI_VERSION="v0.8.7"
+ARG CNI_VERSION="v0.9.0"
 # Configure crictl binary from upstream
 ARG CRICTL_VERSION="v1.19.0"
 
@@ -55,7 +55,7 @@ COPY files/ /
 # Next we download and extract crictl and CNI plugin binaries from upstream.
 #
 # Next we ensure the /etc/kubernetes/manifests directory exists. Normally
-# a kubeadm debain / rpm package would ensure that this exists but we install
+# a kubeadm debian / rpm package would ensure that this exists but we install
 # freshly built binaries directly when we build the node image.
 #
 # Finally we adjust tempfiles cleanup to be 1 minute after "boot" instead of 15m
@@ -115,7 +115,9 @@ RUN echo "Ensuring scripts are executable ..." \
  && echo "Ensuring /etc/kubernetes/manifests" \
     && mkdir -p /etc/kubernetes/manifests \
  && echo "Adjusting systemd-tmpfiles timer" \
-    && sed -i /usr/lib/systemd/system/systemd-tmpfiles-clean.timer -e 's#OnBootSec=.*#OnBootSec=1min#'
+    && sed -i /usr/lib/systemd/system/systemd-tmpfiles-clean.timer -e 's#OnBootSec=.*#OnBootSec=1min#' \
+ && echo "Disabling udev" \
+    && systemctl disable udev.service
 
 # tell systemd that it is in docker (it will check for the container env)
 # https://systemd.io/CONTAINER_INTERFACE/

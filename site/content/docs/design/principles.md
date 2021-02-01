@@ -5,11 +5,10 @@ menu:
     parent: "design"
     identifier: "design-principles"
     weight: 1
+toc: true
+description: |-
+  While developing kind the following principles should be considered.
 ---
-# Principles
-
-While developing kind the following principles should be considered.
-
 ## Degrade Gracefully
 
 As much as possible kind should not fail, because it is to be used for testing.
