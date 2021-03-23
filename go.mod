@@ -7,6 +7,7 @@ require (
 	github.com/alessio/shellescape v1.4.1
 	github.com/evanphx/json-patch/v5 v5.5.0
 	github.com/mattn/go-isatty v0.0.13
+	github.com/metal-stack/go-ipam v1.8.5
 	github.com/pelletier/go-toml v1.9.3
 	github.com/pkg/errors v0.9.1
 	github.com/spf13/cobra v1.1.3
