@@ -54,6 +54,7 @@ func convertv1alpha4Node(in *v1alpha4.Node, out *Node) {
 	out.KubeadmConfigPatches = in.KubeadmConfigPatches
 	out.ExtraMounts = make([]Mount, len(in.ExtraMounts))
 	out.ExtraPortMappings = make([]PortMapping, len(in.ExtraPortMappings))
+	out.ExtraLabels = make(map[string]string)
 	out.KubeadmConfigPatchesJSON6902 = make([]PatchJSON6902, len(in.KubeadmConfigPatchesJSON6902))
 
 	for i := range in.ExtraMounts {
@@ -62,6 +63,10 @@ func convertv1alpha4Node(in *v1alpha4.Node, out *Node) {
 
 	for i := range in.ExtraPortMappings {
 		convertv1alpha4PortMapping(&in.ExtraPortMappings[i], &out.ExtraPortMappings[i])
+	}
+
+	for k, v := range in.ExtraLabels {
+		out.ExtraLabels[k] = v
 	}
 
 	for i := range in.KubeadmConfigPatchesJSON6902 {
