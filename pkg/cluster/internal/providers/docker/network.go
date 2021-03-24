@@ -143,7 +143,7 @@ func removeDuplicateNetworks(name string) (bool, error) {
 	}
 
 	// If we have a network, ensure it's a custom subnet network
-	if len(networks) == 1 {
+	if len(networks) != 0 {
 		cmd := exec.Command("docker", "network", "inspect", "-f",
 			fmt.Sprintf("{{ index .Labels \"%s\"}}", networkCustomSubnetKey),
 			name)
