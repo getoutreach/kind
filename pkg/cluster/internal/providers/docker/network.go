@@ -21,6 +21,7 @@ import (
 	"crypto/sha1"
 	"encoding/binary"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net"
 	"regexp"
@@ -134,23 +135,80 @@ func removeDuplicateNetworks(name string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
+
 	if len(networks) > 1 {
 		if err := deleteNetworks(networks[1:]...); err != nil && !isOnlyErrorNoSuchNetwork(err) {
 			return false, err
 		}
 	}
+
+	// If we have a network, ensure it's a custom subnet network
+	if len(networks) == 1 {
+		cmd := exec.Command("docker", "network", "inspect", "-f",
+			fmt.Sprintf("{{ index .Labels \"%s\"}}", networkCustomSubnetKey),
+			name)
+		b, err := exec.Output(cmd)
+		if err != nil {
+			return false, err
+		}
+
+		if strings.TrimSpace(string(b)) != "true" {
+			// Delete the network, it wasn't migrated
+			if err := deleteNetworks(name); err != nil && !isOnlyErrorNoSuchNetwork(err) {
+				return false, err
+			}
+
+			return false, nil
+		}
+	}
+
 	return len(networks) > 0, nil
 }
 
 func createNetwork(name, ipv6Subnet string) error {
-	if ipv6Subnet == "" {
-		return exec.Command("docker", "network", "create", "-d=bridge",
-			"-o", "com.docker.network.bridge.enable_ip_masquerade=true",
-			name).Run()
-	}
-	return exec.Command("docker", "network", "create", "-d=bridge",
+	args := []string{
+		"network",
+		"create",
+		"-d=bridge",
+		"--label", fmt.Sprintf("%s=%s", networkCustomSubnetKey, "true"),
 		"-o", "com.docker.network.bridge.enable_ip_masquerade=true",
-		"--ipv6", "--subnet", ipv6Subnet, name).Run()
+	}
+
+	subnets := []string{ipv6Subnet}
+
+	// Detect an available ipv4 subnet by creating a network
+	// and then removing it and using the subnet that that network
+	// had
+	err := exec.Command("docker", append(args, name)...).Run()
+	if err != nil {
+		return err
+	}
+
+	ipv4Subnet, err := getIPV4Subnet(name)
+	if err != nil {
+		return err
+	}
+
+	err = deleteNetworks(name)
+	if err != nil {
+		return errors.Wrap(err, "failed to remove transient network")
+	}
+
+	subnets = append(subnets, ipv4Subnet.String())
+
+	// Enable each subnet we have
+	for _, subnet := range subnets {
+		args = append(args, "--subnet", subnet)
+	}
+
+	// If we're ipv6, make sure to include the subnet we found earlier
+	if ipv6Subnet != "" {
+		args = append(args, "--ipv6")
+	}
+
+	args = append(args, name)
+
+	return exec.Command("docker", args...).Run()
 }
 
 func sortedNetworksWithName(name string) ([]string, error) {
