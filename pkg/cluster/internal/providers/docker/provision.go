@@ -345,9 +345,7 @@ func generateNodeLabels(node *config.Node) []string {
 	return args
 }
 
-// generateIPForNode generates a static IP that can be used for this node
-// on the docker network
-func generateIPForNode(networkName string) ([]string, error) {
+func getIPV4Subnet(networkName string) (*net.IPNet, error) {
 	subnets, err := getSubnets(networkName)
 	if err != nil {
 		return nil, err
@@ -368,6 +366,21 @@ func generateIPForNode(networkName string) ([]string, error) {
 		// grab the first ipv4 cidr we find
 		ipv4Subnet = cidr
 		break
+	}
+
+	if ipv4Subnet == nil {
+		return nil, fmt.Errorf("failed to find ipv4 network")
+	}
+
+	return ipv4Subnet, nil
+}
+
+// generateIPForNode generates a static IP that can be used for this node
+// on the docker network
+func generateIPForNode(networkName string) ([]string, error) {
+	ipv4Subnet, err := getIPV4Subnet(networkName)
+	if err != nil {
+		return nil, err
 	}
 
 	usedIPs, err := getUsedIPs(networkName)
