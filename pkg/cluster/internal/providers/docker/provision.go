@@ -24,6 +24,7 @@ import (
 	"strings"
 	"time"
 
+	goipam "github.com/metal-stack/go-ipam"
 	"sigs.k8s.io/kind/pkg/cluster/constants"
 	"sigs.k8s.io/kind/pkg/errors"
 	"sigs.k8s.io/kind/pkg/exec"
@@ -183,6 +184,12 @@ func commonArgs(cluster string, cfg *config.Cluster, networkName string, nodeNam
 		args = append(args, "-e", fmt.Sprintf("%s=%s", key, val))
 	}
 
+	networkArgs, err := generateIPForNode(networkName)
+	if err != nil {
+		return nil, err
+	}
+	args = append(args, networkArgs...)
+
 	// handle hosts that have user namespace remapping enabled
 	if usernsRemap() {
 		args = append(args, "--userns=host")
@@ -237,6 +244,7 @@ func runArgsForNode(node *config.Node, clusterIPFamily config.ClusterIPFamily, n
 
 	// convert mounts and port mappings to container run args
 	args = append(args, generateMountBindings(node.ExtraMounts...)...)
+	args = append(args, generateNodeLabels(node)...)
 	mappingArgs, err := generatePortMappings(clusterIPFamily, node.ExtraPortMappings...)
 	if err != nil {
 		return nil, err
@@ -310,6 +318,79 @@ func getSubnets(networkName string) ([]string, error) {
 		return nil, errors.Wrap(err, "failed to get subnets")
 	}
 	return strings.Split(strings.TrimSpace(lines[0]), " "), nil
+}
+
+func getUsedIPs(networkName string) ([]string, error) {
+	format := `{{range (index . "Containers")}}{{index . "IPv4Address"}} {{end}}`
+	cmd := exec.Command("docker", "network", "inspect", "-f", format, networkName)
+	lines, err := exec.OutputLines(cmd)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get used ip addresses")
+	}
+
+	usedIPs := strings.Split(strings.TrimSpace(lines[0]), " ")
+	for i := range usedIPs { // Trim the CIDR notation
+		usedIPs[i] = strings.Split(usedIPs[i], "/")[0]
+	}
+
+	return usedIPs, nil
+}
+
+func generateNodeLabels(node *config.Node) []string {
+	args := []string{}
+	for k, v := range node.ExtraLabels {
+		args = append(args, "--label", fmt.Sprintf("%s=%s", k, v))
+	}
+
+	return args
+}
+
+// generateIPForNode generates a static IP that can be used for this node
+// on the docker network
+func generateIPForNode(networkName string) ([]string, error) {
+	subnets, err := getSubnets(networkName)
+	if err != nil {
+		return nil, err
+	}
+
+	var ipv4Subnet *net.IPNet
+	for _, subnet := range subnets {
+		ip, cidr, err := net.ParseCIDR(subnet)
+		if err != nil {
+			continue
+		}
+
+		// Skip ipv6 addresses (for now)
+		if ip.To4() == nil {
+			continue
+		}
+
+		// grab the first ipv4 cidr we find
+		ipv4Subnet = cidr
+		break
+	}
+
+	usedIPs, err := getUsedIPs(networkName)
+	if err != nil {
+		return nil, err
+	}
+
+	ipam := goipam.New()
+	ipam.NewPrefix(ipv4Subnet.String())
+
+	// First IP in the block is always being used, so skip it.
+	ipam.AcquireIP(ipv4Subnet.String())
+
+	for _, ip := range usedIPs {
+		ipam.AcquireSpecificIP(ipv4Subnet.String(), ip)
+	}
+
+	ip, err := ipam.AcquireIP(ipv4Subnet.String())
+	if err != nil {
+		return nil, err
+	}
+
+	return []string{"--ip", ip.IP.String()}, nil
 }
 
 // generateMountBindings converts the mount list to a list of args for docker
