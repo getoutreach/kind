@@ -389,16 +389,16 @@ func generateIPForNode(networkName string) ([]string, error) {
 	}
 
 	ipam := goipam.New()
-	ipam.NewPrefix(ipv4Subnet.String())
+	ipam.NewPrefix(context.TODO(), ipv4Subnet.String())
 
 	// First IP in the block is always being used, so skip it.
-	ipam.AcquireIP(ipv4Subnet.String())
+	ipam.AcquireIP(context.TODO(), ipv4Subnet.String())
 
 	for _, ip := range usedIPs {
-		ipam.AcquireSpecificIP(ipv4Subnet.String(), ip)
+		ipam.AcquireSpecificIP(context.TODO(), ipv4Subnet.String(), ip)
 	}
 
-	ip, err := ipam.AcquireIP(ipv4Subnet.String())
+	ip, err := ipam.AcquireIP(context.TODO(), ipv4Subnet.String())
 	if err != nil {
 		return nil, err
 	}
