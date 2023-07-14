@@ -58,7 +58,7 @@ const versionCore = "0.20.0-outreach.1"
 
 // versionPreRelease is the base pre-release portion of the kind CLI version per
 // Semantic Versioning 2.0.0
-const versionPreRelease = ""
+const versionPreRelease = "alpha"
 
 // gitCommitCount count the commits since the last release.
 // It is injected at build time.
